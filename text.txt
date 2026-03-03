@@ -1,0 +1,5 @@
+marwanatef.mahmoud@gmail.com
+mehab1423@gmail.com
+mohamedemad2412@gmail.com
+alimohammedelsayed05@gmail.com
+celery -A src.celery_task worker --loglevel=info
