@@ -36,21 +36,18 @@ from src.auth.schemas import EmailModel  # your Pydantic model
 
 auth_router = APIRouter()
 
+
 @auth_router.post("/send_mail")
-async def send_mail(
-    emails: EmailModel,
-    background_tasks: BackgroundTasks
-):
-    recipients = emails.addresses
+async def send_mail(emails: EmailModel):
+    emails = emails.addresses
 
     html = "<h1>Welcome to the app</h1>"
     subject = "Welcome to our app"
 
-    # Schedule sending email in the background
-    message = create_message(recipients=recipients, subject=subject, body=html)
-    background_tasks.add_task(mail.send_message, message)
+    send_email.delay(emails, subject, html)
 
-    return {"message": "Email is being sent in the background"}
+    return {"message": "Email sent successfully"}
+
 
 
 @auth_router.post(
@@ -60,37 +57,30 @@ async def send_mail(
 )
 async def create_account(
     user_data: UserCreateModel,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+
 ):
-    # Check if user exists
-    user_exist = await user_service.user_exists(user_data.email, session)
+    email = user_data.email 
+
+    user_exist = await user_service.user_exists(email,session)
+
     if user_exist:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User email already exists"
-        )
+         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="User email already exist")
 
-    # Create new user
-    new_user = await user_service.create_user(user_data, session)
+    new_user = await user_service.create_user(user_data,session)
 
-    # Send welcome email in the background
-    subject = "Welcome to Our App!"
-    html = f"<h1>Hello {new_user.email}!</h1><p>Thanks for signing up!</p>"
-    message = create_message(recipients=[new_user.email], subject=subject, body=html)
-    background_tasks.add_task(mail.send_message, message)
 
-    # Create JWT tokens
     access_token = create_access_token(
         user_data={
-            "email": new_user.email,
-            "user_uid": str(new_user.uid)
+            'email': new_user.email,
+            'user_uid': str(new_user.uid)
         }
     )
+
     refresh_token = create_access_token(
-        user_data={
-            "email": new_user.email,
-            "user_uid": str(new_user.uid)
+            user_data={
+            'email': new_user.email,
+            'user_uid': str(new_user.uid)
         },
         refresh=True,
         expiry=timedelta(days=refresh_token_expiry)
@@ -98,16 +88,17 @@ async def create_account(
 
     return JSONResponse(
         content={
-            "message": "Signup Successful",
+            "message":"Login Successful",
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "user": {
-                "email": new_user.email,
+            "user":{
+                "email":new_user.email,
                 "uid": str(new_user.uid)
             }
         }
     )
-
+    
+    return new_user 
 
 
 @auth_router.post("/login")
