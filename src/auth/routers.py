@@ -38,20 +38,16 @@ auth_router = APIRouter()
 
 
 @auth_router.post("/send_mail")
-async def send_mail(
-    emails: EmailModel,
-    background_tasks: BackgroundTasks
-):
-    recipients = emails.addresses
+async def send_mail(emails: EmailModel):
+    emails = emails.addresses
 
     html = "<h1>Welcome to the app</h1>"
     subject = "Welcome to our app"
 
-    # Schedule sending email in the background
-    message = create_message(recipients=recipients, subject=subject, body=html)
-    background_tasks.add_task(mail.send_message, message)
+    send_email.delay(emails, subject, html)
 
-    return {"message": "Email is being sent in the background"}
+    return {"message": "Email sent successfully"}
+
 
 
 @auth_router.post(
