@@ -15,6 +15,9 @@ from src.errors import UserAlreadyExists, UserNotFound, InvalidCredentials, Inva
 from sqlmodel import select
 from sqlalchemy.exc import SQLAlchemyError
 from src.db.models import Users, PasswordResetOtp
+import aiosmtplib
+from email.message import EmailMessage
+
 
 from .dependencies import (
     AccessTokenBearer,
@@ -37,6 +40,7 @@ from src.auth.schemas import EmailModel  # your Pydantic model
 auth_router = APIRouter()
 
 
+
 @auth_router.post("/send_mail")
 async def send_mail(emails: EmailModel):
     emails = emails.addresses
@@ -46,8 +50,8 @@ async def send_mail(emails: EmailModel):
 
     send_email.delay(emails, subject, html)
 
-    return {"message": "Email sent successfully"}
-
+    return {"message": "Email sent successfully"
+    }
 
 
 @auth_router.post(
@@ -146,6 +150,17 @@ async def login_users(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid Email Or Password"
     )
+
+@auth_router.get("/refresh_token")
+async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer())):
+    expiry_timestamp = token_details["exp"]
+
+    if datetime.fromtimestamp(expiry_timestamp) > datetime.now():
+        new_access_token = create_access_token(user_data=token_details["user"])
+
+        return JSONResponse(content={"access_token": new_access_token})
+
+    raise InvalidToken
 
 
 
